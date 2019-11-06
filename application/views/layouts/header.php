@@ -17,6 +17,7 @@
 		<link href="<?= base_url('public/color-admin/assets/css/style.min.css') ?>" rel="stylesheet" />
 		<link href="<?= base_url('public/color-admin/assets/css/style-responsive.min.css') ?>" rel="stylesheet" />
 		<link href="<?= base_url('public/color-admin/assets/css/theme/default.css') ?>" rel="stylesheet" id="theme" />
+		<link href="<?= base_url('public/css/tableexport.min.css') ?>" rel="stylesheet"/>
 		<!-- ================== END BASE CSS STYLE ================== -->
 		
 		<!-- ================== BEGIN PAGE LEVEL STYLE ================== -->
@@ -59,6 +60,9 @@
 	<script src="<?= base_url('public/js/axios.min.js') ?>"></script>
 	<script src="<?= base_url('public/js/jquery.dataTables.min.js') ?>"></script>
 	<script src="<?= base_url('public/js/sweetalert.min.js') ?>"></script>
+	<script src="<?= base_url('public/js/xlsx.core.min.js') ?>"></script>
+	<script src="<?= base_url('public/js/FileSaver.js') ?>"></script>
+	<script src="<?= base_url('public/js/tableexport.min.js') ?>"></script>
 	<!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script> -->
 	<!-- <script src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
 	<!-- <script src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script> -->
@@ -108,50 +112,48 @@
 
 	<body style="background: #eee !important;">
 		<?php if($this->session->has_userdata('user_data')): ?>
-		<?php 
-			$user_data = $this->session->userdata('user_data');
-			$username  = ucfirst($user_data['user_data']->username);
-		?>
-		
-		<div id="page-container" class="fade page-without-sidebar page-header-fixed">
-			<!-- <div id="page-container" class="fade page-sidebar-fixed page-header-fixed in"> -->
-				
-				<div id="header" class="header navbar navbar-default navbar-fixed-top">
-					<div class="container-fluid">
-						<div class="navbar-header">
-							<a href="#" class="navbar-brand"><span class="navbar-logo"></span><b>ACLC Cashiering</b></a>
-							<button type="button" class="navbar-toggle" data-click="sidebar-toggled">
-								<span class="icon-bar"></span>
-								<span class="icon-bar"></span>
-								<span class="icon-bar"></span>
-							</button>
+			<?php 
+				$user_data = $this->session->userdata('user_data');
+				$username  = ucfirst($user_data['user_data']->username);
+			?>
+			<?php if(isset($class) != 'reports'): ?>
+				<div id="page-container" class="fade page-without-sidebar page-header-fixed">				
+					<div id="header" class="header navbar navbar-default navbar-fixed-top">
+						<div class="container-fluid">
+							<div class="navbar-header">
+								<a href="#" class="navbar-brand"><span class="navbar-logo"></span><b>ACLC Cashiering</b></a>
+								<button type="button" class="navbar-toggle" data-click="sidebar-toggled">
+									<span class="icon-bar"></span>
+									<span class="icon-bar"></span>
+									<span class="icon-bar"></span>
+								</button>
+							</div>
+							<ul class="nav navbar-nav navbar-right">
+								<li>
+									<form class="navbar-form full-width">
+										<div class="form-group">
+											<input type="text" class="form-control" id="selected_student" placeholder="Search student here">
+											<button type="submit" class="btn btn-search"><i class="fa fa-search"></i></button>
+										</div>
+									</form>
+								</li>
+								<li class="dropdown navbar-user">
+									<a href="javascript:;" class="dropdown-toggle" data-toggle="dropdown">
+										<img src="<?= base_url('public/color-admin/assets/img/user-13.jpg')?>" alt=""> 
+										<span class="hidden-xs"><?= $username; ?></span> <b class="caret"></b>
+									</a>
+									<ul class="dropdown-menu animated fadeInLeft">
+										<li class="arrow"></li>
+										<li><a href="javascript:;">Edit Profile</a></li>
+										<li><a href="javascript:;"><span class="badge badge-danger pull-right">2</span> Inbox</a></li>
+										<li><a href="javascript:;">Calendar</a></li>
+										<li><a href="javascript:;">Setting</a></li>
+										<li class="divider"></li>
+										<li><a href="/cashier2/auth/logout">Log Out</a></li>
+									</ul>
+								</li>
+							</ul>
 						</div>
-						<ul class="nav navbar-nav navbar-right">
-							<li>
-								<form class="navbar-form full-width">
-									<div class="form-group">
-										<input type="text" class="form-control" id="selected_student" placeholder="Search student here">
-										<button type="submit" class="btn btn-search"><i class="fa fa-search"></i></button>
-									</div>
-								</form>
-							</li>
-							<li class="dropdown navbar-user">
-								<a href="javascript:;" class="dropdown-toggle" data-toggle="dropdown">
-									<img src="<?= base_url('public/color-admin/assets/img/user-13.jpg')?>" alt=""> 
-									<span class="hidden-xs"><?= $username; ?></span> <b class="caret"></b>
-								</a>
-								<ul class="dropdown-menu animated fadeInLeft">
-									<li class="arrow"></li>
-									<li><a href="javascript:;">Edit Profile</a></li>
-									<li><a href="javascript:;"><span class="badge badge-danger pull-right">2</span> Inbox</a></li>
-									<li><a href="javascript:;">Calendar</a></li>
-									<li><a href="javascript:;">Setting</a></li>
-									<li class="divider"></li>
-									<li><a href="/cashier/auth/logout">Log Out</a></li>
-								</ul>
-							</li>
-						</ul>
 					</div>
-				</div>
-			<!-- </div> -->
 			<?php endif; ?>
+		<?php endif; ?>

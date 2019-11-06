@@ -56,7 +56,7 @@
 							<tr v-for="(particular, key) in selected_particulars" v-if="selected_particulars.length">
 								<td>{{particular.name}}</td>
 								<td>{{particular.price}}</td>
-								<td><input type="number" class="form-control input-xs" min="1" value="1" style="width:80px !important;" v-on:change="calc_otherp_total($event)" :data-id="particular.id"></td>
+								<td><input type="number" class="form-control input-xs" min="1" value="1" style="width:80px !important;" v-on:change="add_otherp_quantity($event)" :data-id="particular.id"></td>
 								<td>{{particular.subtotal}}</td>
 								<td class="text-center">
 									<button class="btn btn-default btn-xs" :data-key="key" v-on:click="remove_selectedp($event)" :data-price="particular.price">
@@ -197,7 +197,7 @@
 					<hr style="border:0.5px solid #777 !important;">
 				</h5>
 				<div class="text-center">			
-					<button class="btn btn-sm btn-success" v-if="has_current_bill == false && has_selected" v-on:click="add_to_payments($event)" data-type="down_payment" data-balance="1" data-sy="NA" data-sem="NA">Down Payment</button>
+					<button class="btn btn-sm btn-success" v-if="has_current_bill == false && has_selected && enrollment_status == 'Enrolled'" v-on:click="add_to_payments($event)" data-type="down_payment" data-balance="1" data-sy="NA" data-sem="NA">Down Payment</button>
 				</div><br>
 				<div class="table-responsive" v-if="fee_type == 'regular'">
 					<table class="table table-striped table-hover table-bordered table-condensed">

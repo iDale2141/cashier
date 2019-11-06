@@ -11,9 +11,13 @@
 			has_selected: false,
 			name : 'Please select student',
 			ssi_id: '',
+			spi_id: '',
+			other_payee_id: '',
 			stud_id : '',
+			payee_type: '',
 			enrollment_status : '',
 			course : '',
+			address: {},
 			current_status: '',
 			course_type : '',
 			phone_number : '',
@@ -97,6 +101,7 @@
 			this.select_change();
 			this.reg_payees_dtable();
 			this.view_particulars();
+			// this.print_receipt();
 		},
 		methods: {
 			defaultData: function(){
@@ -182,10 +187,13 @@
 					select: function( event, ui ) {
 						$this.defaultData();
 						$this.select_change();
+						console.log(ui.item)
 						if(ui.item.type == 'student'){
 							$this.has_selected = true;
 							$this.ssi_id = ui.item.ssi_id;
+							$this.spi_id = ui.item.spi_id;
 							$this.name = ui.item.value;
+							$this.address = ui.item.address;
 							$this.stud_id = ui.item.stud_id;
 							$this.enrollment_status = ui.item.enrollment_status;
 							$this.course = ui.item.course;
@@ -195,11 +203,13 @@
 							$this.current_status = ui.item.current_status;
 							$this.school_years_distinct();
 							$this.check_old_balances();
-							// $this.submit_payment();
+							$this.payee_type = ui.item.type;
 						}
 						else{
 							$this.fee_type = 'other';
+							$this.payee_type = ui.item.type;
 							$this.name = ui.item.label;
+							$this.other_payee_id = ui.item.other_payee_id;
 						}
 					},	
 			        focus: function() {
@@ -234,6 +244,7 @@
 		    process_payment_schedule: function(){
 		    	$this = this.periods;
 	    		$.getJSON('<?= base_url("home/payment_schedule") ?>', {sem: this.ps_sem, sy: this.ps_year, fee_type: this.fee_type, period: this.ps_period, ssi_id: this.ssi_id}, function(json, textStatus) {
+	    			console.log(json)
 	    			$this.prelim = json.prelim;
 	    			$this.midterm = json.midterm;
 	    			$this.prefinal = json.prefinal;
@@ -411,29 +422,51 @@
 		    		quantity: parseFloat(1),
 		    		subtotal: parseFloat(e.getAttribute('data-price'))
 		    	};
-		    	this.selected_particulars.push(array);
-		    	this.selected_particulars_total = parseFloat(this.selected_particulars_total) + parseFloat(e.getAttribute('data-price'))
-		    	// this.calc_otherp_total();
+
+		    	$this = this;
+		    	if($this.selected_particulars.length == 0){
+			    	this.selected_particulars.push(array);
+		    	}
+		    	else{
+		    		var does_exist = false;
+			    	$.each($this.selected_particulars, function(index, val) {
+			    		if(val.id == array.id){
+			    			does_exist = true;
+			    			return false;
+			    		}
+			    	});
+			    	if(does_exist == false){
+				    	$this.selected_particulars.push(array);	
+			    	}
+		    	}
+		    	this.calc_otherp_total();
 		    },
 		    remove_selectedp: function(event){
 		    	var e = event.currentTarget;
 		    	var k = e.getAttribute('data-key')
-		    	var p = e.getAttribute('data-price')
-		    	this.selected_particulars_total = parseFloat(this.selected_particulars_total) - parseFloat(p);
 		    	this.$delete(this.selected_particulars, k)
+		    	this.calc_otherp_total();
 		    },
-		    calc_otherp_total: function(){
+		    add_otherp_quantity: function(event){
 		    	var id = event.currentTarget.getAttribute('data-id')
 		    	var q  = event.target.value;
-		    	var total = 0;
-		    	$.each(this.selected_particulars, function(index, val) {
+		    	var $this = this;
+		    	$.each($this.selected_particulars, function(index, val) {
 		    		if(val.id == id){
 		    			val.quantity = q;
 		    			val.subtotal = parseFloat(val.price * val.quantity)
 		    		}
+		    	});
+		    	this.calc_otherp_total();
+		    },
+		    calc_otherp_total: function(){
+		    	var $this = this;
+		    	var total = 0;
+		    	$.each($this.selected_particulars, function(index, val) {
 	    			total += parseFloat(val.subtotal)
 		    	});
-		    	this.selected_particulars_total = total;
+		    	$this.selected_particulars_total = total;
+		    	$this.to_pay = $this.selected_particulars_total;
 		    },
 		    os_or_breakdown: function(event = ""){
 		    	$("#old_acc_summary").modal('toggle')
@@ -516,20 +549,26 @@
 	    		this.format_payments();
 		    },
 		    submit_payment: function(){		
-		    	if(this.fee_type == 'regular'){
-			    	if(this.to_be_paid.length > 0){
-			    		var vpf = this.validate_payment_fields();
-			    		if(vpf){
-			    			this.distribute_payment();
-			    		}
+		  
+    			var vpf = this.validate_payment_fields();
+	    		if(vpf){
+			    	if(this.fee_type == 'regular'){
+				    	if(this.to_be_paid.length > 0){
+	    					this.distribute_payment();	
+				    	}
+				    	else{
+				    		swal("Ooops!", "Select payments first" , "warning");
+				    	}
 			    	}
 			    	else{
-			    		swal("Ooops!", "Select payments first" , "warning");
+			    		if(this.selected_particulars.length > 0){
+				    		this.other_payment();
+			    		}
+			    		else{
+				    		swal("Ooops!", "Select particulars first" , "warning");
+			    		}
 			    	}
-		    	}
-		    	else{
-		    		alert('no other payment yet')
-		    	}
+	    		}
 		    },
 		    validate_payment_fields: function(){
 		    	if(!this.or_served ){
@@ -596,11 +635,122 @@
 		    				current_status: $this.current_status
 		    			},
 		    			function(data, textStatus, xhr) {
-				    		console.log(data)
-			    		}
+		    				console.log(data)
+			    			this.print_receipt(data)
+			    		}.bind(this)
 			    	);
 		    	}
+		    },
+		    other_payment: function(){
+		    	if(this.to_pay < this.selected_particulars_total){
+	    			swal("Ooops!", "The total amount to be paid is " + this.selected_particulars_total + ".", "error")
+		    	}
+		    	else{
+			    	$.post('<?= base_url("home/submit_payment") ?>', 
+			    		{
+			    			data: this.selected_particulars, 
+			    			payments: this.final_payments, 
+		    				fee_type: this.fee_type, 
+		    				to_pay: this.to_pay, 
+		    				or: this.or_served, 
+		    				receipt: this.receipt, 
+		    				date: this.payment_date, 
+		    				ssi_id: this.ssi_id, 
+		    				payee_type: this.payee_type,
+		    				other_payee_id: this.other_payee_id
+			    		}, 
+			    		function(data, textStatus, xhr) {
+			    			this.print_receipt(JSON.parse(data))
+			    		}.bind(this));
+		    	}
+		    },
+		    view_reports: function(){
+	    		window.open('<?= base_url("reports/monthly_collection_report") ?>','popUpWindow','height=4000,width=4000,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no, status=yes');
+		    },
+		    generate_report: function(){
+		    	swal("What report do you wish to generate?", {
+				  buttons: {
+				    monthly: {
+				      text: "Monthly",
+				      value: "monthly",
+				    },
+				    pdc: {
+				      text: "PDC",
+				      value: "pdc",
+				    },				    
+				    daily: {
+				      text: "Daily",
+				      value: "daily",
+				    },
+				  },
+				})
+				.then((value) => {
+					var $this = this;
+				 	switch (value) {
+				    	case "pdc":
+				    	// this.pdc_report()
+					      	break;
+					    case "monthly":
+					    	$this.monthly_report();
+				      	break;
+				    default:
+				    	break;
+				  }
+				});
+		    },
+		    monthly_report: function(){
+		    	var $this = this;
+		    	swal({
+				    title: 'Set month and year',
+					content: {
+					    element: "input",
+					    attributes: {
+					      type: "month"
+					    },
+				  	},				  	
+				    closeOnClickOutside: false
+				})
+				.then((value) => {
+					if(value){
+						$.post('<?= base_url("reports/generate_monthly_report") ?>', {month: value}, function(data, textStatus, xhr) {
+					    	if(data == 'true'){
+				    			swal("Done!", "Report has been succesfully generated in Crystal Report.", "success");
+					    	}
+					    	else{
+				    			swal("Ooops!", "No data to be generated in the selected month.", "error");
+					    	}
+				    	});
+					}
+					else{
+						$this.generate_report();
+					}
+				});
+		    },
+		    print_receipt: function(data){
+		    	console.log(data)
+		    	// var $this = this;
+		    	// var particulars = [];
+		    	// var amt = '';
+		    	// var amt_words = "";
+		    	// if(this.fee_type == 'regular'){
 
+		    	// }
+		    	// else{
+		    	// 	$.each(data, function(index, val) {
+		    	// 		particulars.push({
+		    	// 			particular: val.name,
+		    	// 			amount: val.subtotal
+		    	// 		});
+		    	// 	});
+		    	// }
+		    	// var popupWindow = window.open('<?= base_url('home/receipt'); ?>','popUpWindow','height=300,width=700,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no, status=yes');
+    			// var street = this.address.street ? this.address.street : '';
+    			// var brgy   = this.address.brgy_name ? this.address.brgy_name : '';
+    			// var city   = this.address.city_name ? this.address.city_name : '';
+    			// var address =  street + " " + brgy + ", " + city; 
+		    	// 	popupWindow.rows = particulars;
+	    		// 	popupWindow.name = this.name;
+	    		// 	popupWindow.address = address.toUpperCase();
 		    }
 	  	}
 	});

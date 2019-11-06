@@ -44,13 +44,14 @@ class Home extends CI_Controller
 				"ssi_id"  => $value->ssi_id,
 				"spi_id"  => $value->spi_id,
 				"phone_number" => $value->phone_number,
+				'address' => $this->Home_model->stud_address($value->spi_id),
 				"enrollment_status" => ucwords($this->check_enrollment_status($value->ssi_id)),
 				"course"  => $course['course'] . "-" . $course['year']->year,
 				"course_type" => $course['course_type'], 
 				"type"    => 'student',
 				"data"    => $this->breakdown_data($value->ssi_id),
-				"current_status" =>  $current_status ? strtoupper($current_status->current_stat) : null
-				// "current_status" =>  $value->current_stat ? strtoupper($value->current_stat) : 'Failed to identify'
+				"current_status" =>  $current_status ? strtoupper($current_status->current_stat) : null,
+				"other_payee_id" => ""
 		    ];
 		}
 
@@ -63,12 +64,14 @@ class Home extends CI_Controller
 				"ssi_id"  => '',
 				"spi_id"  => '',
 				"phone_number" => '',
+				'address' => '',
 				"enrollment_status" => '',
 				"course_type" => '',
 				"course"  => '', 
 				"type"    => 'non-student',
 				"data"    => [],
-				"current_status" => ''
+				"current_status" => '',
+				"other_payee_id" => $value->otherPayeeId
 		    ];
 		}
 	    echo json_encode($arr); // if $arr is empty, there must be something wrong with the array $stud_list or $other_payee
@@ -142,7 +145,7 @@ class Home extends CI_Controller
 			$res = $this->Home_model->regular_payment($data);
 		}
 		else{
-			$res = $this->Home_model->other_payment($data);
+			$res = $this->Home_model->other_payment($data->post());
 		}
 		echo json_encode($res);
 	}
@@ -154,7 +157,11 @@ class Home extends CI_Controller
 
 	public function testt(){
 		$home_model = $this->load->model('Home_model');
-		$payment_schedule  = $this->Home_model->testt();
+		$payment_schedule = $this->Home_model->testt();
+	}
+
+	public function receipt(){
+		$this->load->view('receipt');
 	}
 
 }

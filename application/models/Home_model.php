@@ -55,6 +55,24 @@ class Home_model extends CI_Model
 		return $query->row();
 	}
 
+	public function stud_address($spi_id){
+		$sis_db = $this->load->database('sis_db', TRUE);
+		$query  = $sis_db
+					->select(['s_main_address.use_present_address', 'address.street', 'brgy.brgy_name', 'city.city_name'])
+					->where('spi_id', $spi_id)
+					->where('use_present_address', 'yes')
+					->where('address_type', 'permanentAddress')
+					->join('address', 'address.add_id = s_main_address.add_id')
+					->join('brgy', 'address.brgy_id = brgy.brgy_id', 'left')
+					->join('city', 'address.city_id = city.city_id', 'left')
+					->get('s_main_address')
+					->row();
+		if($query){
+			return $query;
+		}
+		return null;
+	}
+
 	public function other_payees($term){
 		
 
@@ -317,7 +335,6 @@ class Home_model extends CI_Model
 	}
 
 	public function payment_schedule($data){
-
 		$sem  = $data['sem'];
 		$sy   = $data['sy'];
 		$type = 'regular';
@@ -328,8 +345,7 @@ class Home_model extends CI_Model
 		$row   = [];
 
 		foreach ($total as $key => $value) {
-
-			if( $value->sem == $sem && $value->sy == $sy ){
+			if( $value['sem'] == $sem && $value['sy'] == $sy ){
 				$row = $value;
 				break;
 			}
@@ -339,7 +355,7 @@ class Home_model extends CI_Model
 		$ret['is_empty'] = true;
 		if($row){
 			$ret['is_empty'] = false;
-			$row_total = $row->total_2;
+			$row_total = $row['total_2'];
 
 			if($type == 'regular'){
 				if( $this->sy == $sy && $this->sem == $sem ){
@@ -402,7 +418,7 @@ class Home_model extends CI_Model
 					$ret['final'] = "";
 					$ret['total'] = (double)$row_total;
 				}
-			}
+			}	
 		}
 
 		return $ret;
@@ -563,14 +579,15 @@ class Home_model extends CI_Model
 		$course   = $data->post('course');
 		$current_status = $data->post('current_status');
 
+		// CHECK IF PAYMENT INCLUDES DOWNPAYMENT
 		foreach ($payments as $key => $value) {
 			if($value['sy'] == 'DownPayment'){
 				$dp_val = $value['value'];
 				unset($payments[$key]);
 				array_push($payments, ['sy' => $this->sy, 'sem' => $this->sem, 'value' => $dp_val]);
+				$bills = $this->set_bills($ssi_id, $course);
 			}
 		}
-
 		$roll_back_items = []; // roll back changes in the database if something went wrong
 
 		$payment_rows = array(
@@ -597,111 +614,102 @@ class Home_model extends CI_Model
 		foreach ($payments as $key => $value) {
 
 			$distribution_amount = floatval($value['value']);
+			$select = ' assessment.assessmentId,
+						assessment.ssi_id,
+						sy.sy,
+						sem.sem,
+						assessment.particular,
+						assessment.amt1 as price1,
+						assessment.amt2 as price2,
+						IFNULL(pd.amt1,0) as paid1,
+						IFNULL(pd.amt2,0)as paid2,
+						CAST(assessment.amt1 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt1,0) AS DECIMAL(9, 2)) as remaining_balance1,
+						CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2)) as remaining_balance2';
 
-			if(strtolower($value['sy']) == 'downpayment'){
-				// $dp = $this->down_payment($distribution_amount, $course, $current_status);
-			}
-			if(strtolower($value['sy']) == 'oldsystem'){
-				// code to old system
-			}
-			else{
+			$result = $this->db
+						->select($select)
+						->where('assessment.ssi_id', $ssi_id)
+						->where('(CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2))) >' , 0)
+						->where('sy.sy', $value['sy'])
+						->where('sem.sem', $value['sem'])
+						->join('sy', 'sy.syId = assessment.syId')
+						->join('sem', 'sem.semId = assessment.semId')
+						->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', 'LEFT')
+						->get('assessment')->result();
 
-				$select = ' assessment.assessmentId,
-							assessment.ssi_id,
-							sy.sy,
-							sem.sem,
-							assessment.particular,
-							assessment.amt1 as price1,
-							assessment.amt2 as price2,
-							IFNULL(pd.amt1,0) as paid1,
-							IFNULL(pd.amt2,0)as paid2,
-							CAST(assessment.amt1 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt1,0) AS DECIMAL(9, 2)) as remaining_balance1,
-							CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2)) as remaining_balance2';
+			try {
+				foreach ($result as $res_key => $res_value) {
+					if($distribution_amount > 0){
+						if( $distribution_amount >= $res_value->remaining_balance2 ){
 
-				$result = $this->db
-							->select($select)
-							->where('assessment.ssi_id', $ssi_id)
-							->where('(CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2))) >' , 0)
-							->where('sy.sy', $value['sy'])
-							->where('sem.sem', $value['sem'])
-							->join('sy', 'sy.syId = assessment.syId')
-							->join('sem', 'sem.semId = assessment.semId')
-							->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', 'LEFT')
-							->get('assessment')->result();
+							$paymentdetail_rows = array(
+								'assessmentId' => $res_value->assessmentId,
+								'amt1' => $res_value->remaining_balance1,
+								'amt2' => $res_value->remaining_balance2,
+								'paymentId' => $payment_id,
+							);
+							$this->db->insert('paymentdetails', $paymentdetail_rows);
+							$total_amt1 += (double)$res_value->remaining_balance1;
 
-				try {
-					foreach ($result as $res_key => $res_value) {
-						if($distribution_amount > 0){
-							if( $distribution_amount >= $res_value->remaining_balance2 ){
+							// item to be rolled back if ever
+							$pd_id = $this->db->insert_id(); 
+							$roll_back_items['paymentdetails'][] = $pd_id;
 
-								$paymentdetail_rows = array(
-									'assessmentId' => $res_value->assessmentId,
-									'amt1' => $res_value->remaining_balance1,
-									'amt2' => $res_value->remaining_balance2,
-									'paymentId' => $payment_id,
-								);
-								$this->db->insert('paymentdetails', $paymentdetail_rows);
-								$total_amt1 += (double)$res_value->remaining_balance1;
-
-								// item to be rolled back if ever
-								$pd_id = $this->db->insert_id(); 
-								$roll_back_items['paymentdetails'][] = $pd_id;
-
-								$distribution_amount -= floatval($res_value->remaining_balance2);
-								$particulars_tbp = [
-									'particular' => $res_value->particular,
-									'amount' => $res_value->remaining_balance2
-								];
-								array_push($paid_particulars, $particulars_tbp);
-								continue;
-							}
-							if( $distribution_amount < $res_value->remaining_balance2 ){
-								// get percentage then amount for amount1
-								$percentage = ($distribution_amount / $res_value->price2);
-								$amt1_val   = $res_value->price1 * $percentage;
-
-								$paymentdetail_rows = array(
-									'assessmentId' => $res_value->assessmentId,
-									'amt1' => $amt1_val,
-									'amt2' => $distribution_amount,
-									'paymentId' => $payment_id,
-								);
-
-								$this->db->insert('paymentdetails', $paymentdetail_rows);
-								$total_amt1 += (double)$amt1_val;
-
-								// item to be rolled back if ever
-								$pd_id = $this->db->insert_id(); 
-								$roll_back_items['paymentdetails'][] = $pd_id;
-
-								$particulars_tbp = [
-									'particular' => $res_value->particular,
-									'amount' => $distribution_amount
-								];
-								array_push($paid_particulars, $particulars_tbp);
-								$distribution_amount = 0;
-								break;
-							}
-
+							$distribution_amount -= floatval($res_value->remaining_balance2);
+							$particulars_tbp = [
+								'particular' => $res_value->particular,
+								'amount' => $res_value->remaining_balance2
+							];
+							array_push($paid_particulars, $particulars_tbp);
+							continue;
 						}
-						else{
+						if( $distribution_amount < $res_value->remaining_balance2 ){
+							// get percentage then amount for amount1
+							$percentage = ($distribution_amount / $res_value->price2);
+							$amt1_val   = $res_value->price1 * $percentage;
+
+							$paymentdetail_rows = array(
+								'assessmentId' => $res_value->assessmentId,
+								'amt1' => $amt1_val,
+								'amt2' => $distribution_amount,
+								'paymentId' => $payment_id,
+							);
+
+							$this->db->insert('paymentdetails', $paymentdetail_rows);
+							$total_amt1 += (double)$amt1_val;
+
+							// item to be rolled back if ever
+							$pd_id = $this->db->insert_id(); 
+							$roll_back_items['paymentdetails'][] = $pd_id;
+
+							$particulars_tbp = [
+								'particular' => $res_value->particular,
+								'amount' => $distribution_amount
+							];
+							array_push($paid_particulars, $particulars_tbp);
+							$distribution_amount = 0;
 							break;
 						}
-					}
-				} 
-				catch (Exception $e) {
 
-					foreach (array_reverse($roll_back_items) as $key => $value) {
-						$id = $key == 'payments' ? 'paymentId' : 'paymentDetailsId';
-						foreach ($value as $key1 => $value1) {
-							$this->db->where($id, $value1);
-							$this->db->delete($key);
-						}
 					}
-					break;
-					return false;	
+					else{
+						break;
+					}
 				}
+			} 
+			catch (Exception $e) {
+
+				foreach (array_reverse($roll_back_items) as $key => $value) {
+					$id = $key == 'payments' ? 'paymentId' : 'paymentDetailsId';
+					foreach ($value as $key1 => $value1) {
+						$this->db->where($id, $value1);
+						$this->db->delete($key);
+					}
+				}
+				break;
+				return false;	
 			}
+			
 		}
 
 		$new_amt1 = array(
@@ -714,26 +722,94 @@ class Home_model extends CI_Model
 		return $paid_particulars;
 	}
 
-	public function down_payment($to_pay, $course, $current_status){
+	public function set_bills($ssi_id, $course){
 
 		$course = $course ? explode('-', $course)[0] : '';
+		$sis_db = $this->load->database('sis_db', TRUE);
 
-		// $payment_rows = array(
-		//         'username' => 'hahha'
-		// );
-		// $this->db->insert('users', $payment_rows);
+		$ct_qry = $this->db->select('courseType')->where('particularName', $course)->get('particulars')->row();
+		$course_type = $ct_qry ? $ct_qry->courseType : null;
 
-		$particulars = $this->db
-						->where('particularName', $course)
-						->get('particulars')
-						->result();
+		$year = $sis_db
+					->where('ssi_id', $ssi_id)
+					->where('sch_year', $this->sy)
+					->where('semester', $this->sem)
+					->get('year')
+					->row();
 
-		return $particulars;
+		if($year){ // if $year is empty, it means ssi_id is not enrolled during the current SY/SEM
+
+			// particulars to bill
+			$particulars = $this->db
+				->where('syId', $this->syId)
+				->where('semId', $this->semId)
+				->where('feeType', 'Miscellaneous')
+				->where('courseType', $course_type)
+				->where('studentStatus', $year->current_stat)
+				->get('particulars')->result();
+
+			if($particulars){
+				foreach ($particulars as $key => $value) {
+					$assessment_rows = array(
+				        'ssi_id' => $ssi_id,
+				        'particular' => $value->particularName,
+				        'amt1' => $value->amt1,
+				        'amt2' => $value->amt2,
+				        'feeType' => 'Miscellaneous',
+				        'semId' => $this->semId,
+				        'syId' => $this->syId
+					);
+					$this->db->insert('assessment', $assessment_rows);
+				}
+				return true;
+			}
+			else{
+				return 'NO PARTICULARS'; // no particulars in current SY | SEM
+			}
+		}
+		else{
+			return 'NOT ENROLLED'; // not enrolled
+		}
 	}
 
 	public function other_payment($data){
-		// return $data;
-		return "oth";
+		$to_pay = $data['to_pay'];
+		$or = $data['or'];
+		$receipt = $data['receipt'];
+		$date = $data['date'];
+		$payee_type = $data['payee_type'];
+		$ssi_id = $data['ssi_id'];
+		$other_payee_id = $data['other_payee_id'];
+
+		$data = $data['data'];
+
+		$payment_rows = array(
+		        'ssi_id' => $ssi_id,
+		        'orNo' => $or,
+		        'paymentDate' => $date,
+		        'amt1' => $to_pay,
+		        'amt2' => $to_pay,
+		        'paymentMode' => 'cash',
+		        'cashier' => $this->username,
+		        'semId' => $this->semId,
+		        'syId' => $this->syId,
+		        'printingType' => $receipt,
+		        'otherPayeeId' => $other_payee_id
+		);
+		$this->db->insert('payments', $payment_rows);
+		$payment_id = $this->db->insert_id();
+
+		foreach ($data as $key => $value) {
+			$a = [
+				'assessmentId' => null,
+				'particularId' => $value['id'],
+				'amt1' => $value['subtotal'],
+				'amt2' => $value['subtotal'],
+				'paymentId' => $payment_id
+			];
+			$this->db->insert('paymentdetails', $a);	
+		}
+		return $data;
 	}
 
 	public function sy_sem_id(){
@@ -758,43 +834,46 @@ class Home_model extends CI_Model
 
 	public function test(){
 		$ssi_id = '9304';
-		
-		$course_type = "";
+		$to_pay = 130;
+		$data = [
+			[
+				"id" => "13",
+				"name" => "ID Sling",
+				"price" => "30",
+				"quantity" => "1",
+				"subtotal" => "30"
+			],
+			[
+				"id" => "14",
+				"name" => "Student Hand Book",
+				"price" => "100",
+				"quantity" => "1",
+				"subtotal" => "100"
+			]
+		];
 
-		// bill him
-		$particulars = $this->db
-						->where('syId', $this->syId)
-						->where('semId', $this->semId)
-						->where('feeType', 'Miscellaneous')
-						->get('particulars')->result();
-
-
-		echo "<pre>";
-		print_r($particulars);
-
+		foreach ($data as $key => $value) {
+			echo "<pre>";
+			print_r($value);
+		}
 	}
-	public function testt(){
-		$ssi_id = '9304';
-
-		echo $this->sy;
-		echo $this->sem;
+	public function testt($spi_id = '9304'){
 
 		$sis_db = $this->load->database('sis_db', TRUE);
-		$select = ['stud_per_info.spi_id', 'stud_per_info.fname', '.stud_per_info.lname', 'stud_per_info.mname', 'stud_sch_info.ssi_id', 'stud_sch_info.stud_id', 'phone_numbers.phone_number'];
 		$query  = $sis_db
-					->select($select)
-					// ->where('year.sch_year', $this->sy)
-					// ->where('year.semester', $this->sem)
-					// ->like('stud_per_info.lname', $term)
-					// ->or_like('stud_per_info.fname', $term)
-					->join('stud_per_info', 'stud_sch_info.spi_id = stud_per_info.spi_id')
-					->join('student_phone', 'student_phone.spi_id = stud_per_info.spi_id', 'left')
-					->join('phone_numbers', 'phone_numbers.phone_id = student_phone.phone_id', 'left')
-					->join('year', 'stud_sch_info.ssi_id = year.ssi_id')
-					->get('stud_sch_info', 5);
-		echo "<pre>";
-		 print_r($query->result());
-
+					->select(['s_main_address.use_present_address', 'address.street', 'brgy.brgy_name', 'city.city_name'])
+					->where('spi_id', $spi_id)
+					->where('use_present_address', 'yes')
+					->where('address_type', 'permanentAddress')
+					->join('address', 'address.add_id = s_main_address.add_id')
+					->join('brgy', 'address.brgy_id = brgy.brgy_id', 'left')
+					->join('city', 'address.city_id = city.city_id', 'left')
+					->get('s_main_address')
+					->row();
+		if($query){
+			return $query;
+		}
+		return null;
 	}
 
 }

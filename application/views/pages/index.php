@@ -81,7 +81,7 @@
 						<?php $this->load->view('pages/payments'); ?>
 					</div>
 					<div class="tab-pane fade" id="reports_ab">
-						<?php $this->load->view('pages/reports'); ?>
+						<?php $this->load->view('pages/reports'); ?>	
 					</div>
 					<div class="tab-pane fade" id="others_tab">
 						<?php $this->load->view('pages/others'); ?>
@@ -129,6 +129,7 @@
 						</div><br>
 						<div class="form-group mb5">
 							<button type="button" class="btn btn-lg btn-primary form-control" style="min-height: 70px; font-size: 20px;" v-on:click="submit_payment()">PAY</button>
+							<a href="<?= base_url('home/receipt'); ?>" class="btn btn-lg btn-success form-control">PRINT RECEIPT</a>
 						</div>
 					</form>
 
