@@ -1,7 +1,7 @@
 
 
 <script>
-
+	
 	var sb = new Vue({
 		el: '#app',
 		data: {
@@ -85,7 +85,7 @@
 				data: []
 			},
 			// payment_form
-			or_served: 'sample',
+			or_served: '',
 			to_pay: '0',
 			cash: '0',
 			change: '0',
@@ -101,49 +101,104 @@
 			this.select_change();
 			this.reg_payees_dtable();
 			this.view_particulars();
-			// this.print_receipt();
 		},
 		methods: {
-			defaultData: function(){
+			numberToWords: function(s){		
+				var th = ['','thousand','million', 'billion','trillion'];
+				var dg = ['zero','one','two','three','four', 'five','six','seven','eight','nine'];
+				var tn = ['ten','eleven','twelve','thirteen', 'fourteen','fifteen','sixteen', 'seventeen','eighteen','nineteen'];
+				var tw = ['twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety']; 
+				
+				s = (s||'').toString(); s = s.replace(/[\, ]/g,''); if (s != parseFloat(s)) return 'not a number'; var x = s.indexOf('.'); if (x == -1) x = s.length; if (x > 15) return 'too big'; var n = s.split(''); var str = ''; var sk = 0; for (var i=0; i < x; i++) {if ((x-i)%3==2) {if (n[i] == '1') {str += tn[Number(n[i+1])] + ' '; i++; sk=1;} else if (n[i]!=0) {str += tw[n[i]-2] + ' ';sk=1;}} else if (n[i]!=0) {str += dg[n[i]] +' '; if ((x-i)%3==0) str += 'hundred ';sk=1;} if ((x-i)%3==1) {if (sk) str += th[(x-i-1)/3] + ' ';sk=0;}} if (x != s.length) {var y = s.length; str += 'point '; for (var i=x+1; i<y; i++) str += dg[n[i]] +' ';} return str.replace(/\s+/g,' ');
+			},
+			resetData: function(){
 				var a = {
-					ses_sy : "<?= $this->session->get_userdata('user_data')['user_data']['sy'] ?>",
-					ses_sem : "<?= $this->session->get_userdata('user_data')['user_data']['sem'] ?>",
-					has_selected: false,
-					name : 'Please select student',
-					ssi_id: '',
-					stud_id : '',
-					enrollment_status : '',
-					course : '',
-					phone_number : '',
-					fee_summary : [],
-					fee_type: 'regular',
-					regular_hide: '',
-					special_hide: '',
-					sy_regular: [],
-					sy_special: [],
-					ps_sem: '1st',
-					ps_year: '',
-					ps_period: 'prelim',
-					selected_sum_sy: '',
-					selected_sum_sem: '',
-					periods: {
-						prelim: '',
-						midterm: '',
-						prefinal: '',
-						final: '',
-						total: '',
-						is_current: '',
-						is_empty: ''
-					},
-					summary_details_bills: {},
-					summary_details_payments: {},
-					all_or_details: {},
-					current_or: '',
-					current_or_status: '',
-					current_or_id: '',
-					tab_key: 0,
-					bill_visibility: '',
-					payment_visibility: 'hidden'
+							ses_sy : "<?= $this->session->get_userdata('user_data')['user_data']['sy'] ?>",
+							ses_sem : "<?= $this->session->get_userdata('user_data')['user_data']['sem'] ?>",
+							has_selected: false,
+							name : 'Please select student',
+							ssi_id: '',
+							spi_id: '',
+							other_payee_id: '',
+							stud_id : '',
+							payee_type: '',
+							enrollment_status : '',
+							course : '',
+							address: {},
+							current_status: '',
+							course_type : '',
+							phone_number : '',
+							fee_summary : {
+								old_system: []				
+							},
+							has_current_bill: false,
+							fee_type: 'regular',
+							regular_hide: '',
+							special_hide: '',
+							sy_regular: [],
+							sy_special: [],
+							ps_sem: '1st',
+							ps_year: '',
+							ps_period: 'prelim',
+							selected_sum_sy: '',
+							selected_sum_sem: '',
+							periods: {
+								prelim: '',
+								midterm: '',
+								prefinal: '',
+								final: '',
+								total: '',
+								is_current: '',
+								is_empty: ''
+							},
+							summary_details_bills: {},
+							summary_details_payments: {},
+							all_or_details: {},
+							current_or: '',
+							current_or_status: '',
+							current_or_id: '',
+							tab_key: 0,
+							bill_visibility: '',
+							payment_visibility: 'hidden',
+							other_payees_form : {
+								fname: '',
+								mname: '',
+								lname: '',
+								ext: '',
+								address: '',
+								isValid: '',
+							},
+							other_payees_modal:{
+								id: '',
+								fname: '',
+								mname: '',
+								lname: '',
+								ext: '',
+								address: '',
+							},
+							// other particulars
+							add_particular_form: {
+								particular_type: 'special',
+								particular: '',
+								price: 0,
+							},
+							selected_particulars: [],
+							selected_particulars_total: 0,
+							selected_os_or: {
+								or: "",
+								data: []
+							},
+							// payment_form
+							or_served: '',
+							to_pay: '0',
+							cash: '0',
+							change: '0',
+							distributed_cash_remaining: '0',
+							to_be_paid: [],
+							formatted_payments: [],
+							final_payments: [],
+							receipt: 'OR',
+							payment_date: "<?php echo date('Y-m-d'); ?>"
 				};
 				Object.assign(this.$data, a);
 			},
@@ -185,11 +240,11 @@
 				        } );
 					},
 					select: function( event, ui ) {
-						$this.defaultData();
-						$this.select_change();
 						console.log(ui.item)
+						$this.resetData();
+						$this.select_change();
+						$this.has_selected = true;
 						if(ui.item.type == 'student'){
-							$this.has_selected = true;
 							$this.ssi_id = ui.item.ssi_id;
 							$this.spi_id = ui.item.spi_id;
 							$this.name = ui.item.value;
@@ -209,6 +264,7 @@
 							$this.fee_type = 'other';
 							$this.payee_type = ui.item.type;
 							$this.name = ui.item.label;
+							$this.fee_summary = ui.item.data;
 							$this.other_payee_id = ui.item.other_payee_id;
 						}
 					},	
@@ -606,63 +662,91 @@
 		    },
 		    reg_final_payment: function(){
 		    	var $this = this;
-		    	var el = this.$refs.all_payments;
-		    	$this.final_payments = [];
-		    	var dcr = parseFloat(this.distributed_cash_remaining);
 
-		    	if( dcr > 0 || dcr < 0 ){
-		    		dcr > 0 ? alert("Please expend remaining cash.") : alert("Insufficient funds."); 
-		    	}
-		    	else{
-		    		$.each(el, function(index, val) {
-			    		$this.final_payments.push({
-			    			'sy' : this.getAttribute('data-sy'),
-			    			'sem': this.getAttribute('data-sem'),
-			    			'value': this.value
-			    		});
-			    	});
-			    	$.post('<?= base_url("home/submit_payment") ?>', 
-		    			{
-		    				payments: $this.final_payments, 
-		    				fee_type: $this.fee_type, 
-		    				to_pay: $this.to_pay, 
-		    				or: $this.or_served, 
-		    				receipt: $this.receipt, 
-		    				date: $this.payment_date, 
-		    				ssi_id: $this.ssi_id, 
-		    				course_type: $this.course_type,
-		    				course: $this.course,
-		    				current_status: $this.current_status
-		    			},
-		    			function(data, textStatus, xhr) {
-		    				console.log(data)
-			    			this.print_receipt(data)
-			    		}.bind(this)
-			    	);
-		    	}
+		    	swal({
+					title: "Are you sure?",
+					icon: "warning",
+					buttons: true,
+					dangerMode: true,
+				})
+				.then((proceed) => {
+				  	if (proceed) {
+				    	var el = this.$refs.all_payments;
+				    	$this.final_payments = [];
+				    	var dcr = parseFloat(this.distributed_cash_remaining);
+
+				    	if( dcr > 0 || dcr < 0 ){
+				    		dcr > 0 ? alert("Please expend remaining cash.") : alert("Insufficient funds."); 
+				    	}
+				    	else{
+				    		$.each(el, function(index, val) {
+					    		$this.final_payments.push({
+					    			'sy' : this.getAttribute('data-sy'),
+					    			'sem': this.getAttribute('data-sem'),
+					    			'value': this.value
+					    		});
+					    	});
+					    	$.post('<?= base_url("home/submit_payment") ?>', 
+				    			{
+				    				payments: $this.final_payments, 
+				    				fee_type: $this.fee_type, 
+				    				to_pay: $this.to_pay, 
+				    				or: $this.or_served, 
+				    				receipt: $this.receipt, 
+				    				date: $this.payment_date, 
+				    				ssi_id: $this.ssi_id, 
+				    				course_type: $this.course_type,
+				    				course: $this.course,
+				    				current_status: $this.current_status
+				    			},
+				    			function(data, textStatus, xhr) {
+				    				console.log(data)
+					    			this.print_receipt(JSON.parse(data))
+					    		}.bind(this)
+					    	);
+				    	}
+					}
+				});
 		    },
 		    other_payment: function(){
-		    	if(this.to_pay < this.selected_particulars_total){
-	    			swal("Ooops!", "The total amount to be paid is " + this.selected_particulars_total + ".", "error")
-		    	}
-		    	else{
-			    	$.post('<?= base_url("home/submit_payment") ?>', 
-			    		{
-			    			data: this.selected_particulars, 
-			    			payments: this.final_payments, 
-		    				fee_type: this.fee_type, 
-		    				to_pay: this.to_pay, 
-		    				or: this.or_served, 
-		    				receipt: this.receipt, 
-		    				date: this.payment_date, 
-		    				ssi_id: this.ssi_id, 
-		    				payee_type: this.payee_type,
-		    				other_payee_id: this.other_payee_id
-			    		}, 
-			    		function(data, textStatus, xhr) {
-			    			this.print_receipt(JSON.parse(data))
-			    		}.bind(this));
-		    	}
+
+		    	var $this = this;
+		    	swal({
+					title: "Are you sure?",
+					icon: "warning",
+					buttons: true,
+					dangerMode: true,
+				})
+				.then((proceed) => {
+				  	if (proceed) {
+						if($this.has_selected){
+					    	if($this.to_pay < $this.selected_particulars_total){
+				    			swal("Ooops!", "The total amount to be paid is " + $this.selected_particulars_total + ".", "error")
+					    	}
+					    	else{
+						    	$.post('<?= base_url("home/submit_payment") ?>', 
+						    		{
+						    			data: $this.selected_particulars, 
+						    			payments: $this.final_payments, 
+					    				fee_type: $this.fee_type, 
+					    				to_pay: $this.to_pay, 
+					    				or: $this.or_served, 
+					    				receipt: $this.receipt, 
+					    				date: $this.payment_date, 
+					    				ssi_id: $this.ssi_id, 
+					    				payee_type: $this.payee_type,
+					    				other_payee_id: $this.other_payee_id
+						    		}, 
+					    		function(data, textStatus, xhr) {
+					    			$this.print_receipt(JSON.parse(data))
+					    		}.bind($this));
+					    	}
+				    	}
+				    	else{
+				    		alert()
+				    	}
+					}
+				});
 		    },
 		    view_reports: function(){
 	    		window.open('<?= base_url("reports/monthly_collection_report") ?>','popUpWindow','height=4000,width=4000,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no, status=yes');
@@ -727,30 +811,53 @@
 				});
 		    },
 		    print_receipt: function(data){
-		    	console.log(data)
-		    	// var $this = this;
-		    	// var particulars = [];
-		    	// var amt = '';
-		    	// var amt_words = "";
-		    	// if(this.fee_type == 'regular'){
-
-		    	// }
-		    	// else{
-		    	// 	$.each(data, function(index, val) {
-		    	// 		particulars.push({
-		    	// 			particular: val.name,
-		    	// 			amount: val.subtotal
-		    	// 		});
-		    	// 	});
-		    	// }
-		    	// var popupWindow = window.open('<?= base_url('home/receipt'); ?>','popUpWindow','height=300,width=700,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no, status=yes');
-    			// var street = this.address.street ? this.address.street : '';
-    			// var brgy   = this.address.brgy_name ? this.address.brgy_name : '';
-    			// var city   = this.address.city_name ? this.address.city_name : '';
-    			// var address =  street + " " + brgy + ", " + city; 
-		    	// 	popupWindow.rows = particulars;
-	    		// 	popupWindow.name = this.name;
-	    		// 	popupWindow.address = address.toUpperCase();
+		    	var particulars = [];
+		    	if(this.fee_type == 'regular'){
+		    		$.each(data, function(index, val) {
+		    			particulars.push({
+		    				particular: val.particular,
+		    				amount: val.amount
+		    			});
+		    		});
+		    	}
+		    	else{
+		    		$.each(data, function(index, val) {
+		    			particulars.push({
+		    				particular: val.name,
+		    				amount: val.subtotal
+		    			});
+		    		});
+		    	}
+		    	
+		    	if(this.receipt == 'OR'){
+			    	var $this = this;
+			    	var amt = '';
+			    	var amt_words = "";
+			    	var or = window.open('<?= base_url('home/receipt'); ?>','or','height=500,width=900,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
+	    			var street = this.address.street ? this.address.street : '';
+	    			var brgy   = this.address.brgy_name ? this.address.brgy_name : '';
+	    			var city   = this.address.city_name ? this.address.city_name : '';
+	    			var address =  street + " " + brgy + ", " + city; 
+			    		or.rows = particulars;
+		    			or.name = this.name;
+		    			or.address = address.toUpperCase();
+		    			or.amount = this.to_pay;
+		    			or.amt_words = this.numberToWords(this.to_pay)
+		    			or.date = this.payment_date;
+		    	}
+		    	else{
+			    	var ar = window.open('<?= base_url('home/receipt_acknowledgement'); ?>','ar','height=500,width=900,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
+			    		ar.or_served = this.or_served;
+		    			ar.name = this.name;
+		    			ar.amount = this.to_pay;
+		    			ar.amt_words = this.numberToWords(this.to_pay)
+		    			ar.date = this.payment_date;
+		    			ar.rows = particulars;
+		    	}
+		    	// location.reload();
+		    	$('.modal').modal('hide');
+		    	$("#selected_student").val('');
+		    	this.resetData();
 		    }
 	  	}
 	});

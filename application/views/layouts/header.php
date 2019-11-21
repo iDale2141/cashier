@@ -132,7 +132,7 @@
 								<li>
 									<form class="navbar-form full-width">
 										<div class="form-group">
-											<input type="text" class="form-control" id="selected_student" placeholder="Search student here">
+											<input type="text" class="form-control" id="selected_student" placeholder="Search student here" autofocus>
 											<button type="submit" class="btn btn-search"><i class="fa fa-search"></i></button>
 										</div>
 									</form>
@@ -144,11 +144,11 @@
 									</a>
 									<ul class="dropdown-menu animated fadeInLeft">
 										<li class="arrow"></li>
-										<li><a href="javascript:;">Edit Profile</a></li>
+										<!-- <li><a href="javascript:;">Edit Profile</a></li>
 										<li><a href="javascript:;"><span class="badge badge-danger pull-right">2</span> Inbox</a></li>
 										<li><a href="javascript:;">Calendar</a></li>
 										<li><a href="javascript:;">Setting</a></li>
-										<li class="divider"></li>
+										<li class="divider"></li> -->
 										<li><a href="/cashier2/auth/logout">Log Out</a></li>
 									</ul>
 								</li>

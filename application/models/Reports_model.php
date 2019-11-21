@@ -42,7 +42,6 @@ class Reports_model extends CI_Model
 			$studentServices_amt = 0;
 			$sap_amt = 0;
 			$stcab_amt = 0;
-			$culturalFee_amt = 0;
 			$insurance_amt = 0;
 			$office365_amt = 0;
 			$shs_amt = 0;
@@ -91,9 +90,6 @@ class Reports_model extends CI_Model
 				}
 				if($or_val->collectionReportGroup == 'stcab'){
 					$stcab_amt += $or_val->amt1;
-				}	
-				if($or_val->collectionReportGroup == 'culturalFee'){
-					$culturalFee_amt += $or_val->amt1;
 				}
 				if($or_val->collectionReportGroup == 'insurance'){
 					$insurance_amt += $or_val->amt1;

@@ -216,12 +216,12 @@
 				<div class="table-responsive pre-scrollable" style="min-height: 300px !important;">
 					<table class="table table-hover table-condensed">
 						<thead>
-							<th>Particular</th>
+							<th>OR</th>
 							<th>Amount</th>
 						</thead>
 						<tbody>
 							<tr v-for="sp in fee_summary.special_payments">
-								<td>{{sp.particularName}}</td>
+								<td>{{sp.orNo}}</td>
 								<td>{{formatPrice(sp.paid_amount)}}</td>
 							</tr>
 						</tbody>

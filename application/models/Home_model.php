@@ -141,13 +141,23 @@ class Home_model extends CI_Model
 		return $query->result()[0];
 	}
 
-	public function breakdown_data($ssi_id){
+	public function breakdown_data($payee_type, $payee_id){
 		
-		$array = array(
-			"regular_fees" => $this->regular_summary($ssi_id),
-			"special_payments" => $this->special_payments($ssi_id),
-			"old_system" => $this->old_system_balance($ssi_id)
-		);
+		if($payee_type == 'student'){
+			$array = array(
+				"regular_fees" => $this->regular_summary($payee_id),
+				"special_payments" => $this->special_payments($payee_type, $payee_id),
+				"old_system" => $this->old_system_balance($payee_id)
+			);
+		}
+		else{
+			$array = array(
+				"regular_fees" => [],
+				"special_payments" => $this->special_payments($payee_type, $payee_id),
+				"old_system" => []
+			);	
+		}
+
 		return $array;
 	}
 
@@ -314,15 +324,19 @@ class Home_model extends CI_Model
 		return $array;
 	}
 
-	public function special_payments($ssi_id){
+	public function special_payments($payee_type, $payee_id){
 		$select = ' sy.sy,
 					sem.sem,
 					payments.orNo,
 					particulars.particularName,
 					pd.amt2 AS paid_amount,
 					payments.amt2 AS or_amount';
-		$where = array('payments.ssi_id' => $ssi_id);
-
+		if($payee_type == 'student'){
+			$where = array('payments.ssi_id' => $payee_id);
+		}
+		else{
+			$where = array('payments.otherPayeeId' => $payee_id);
+		}
 		$result = $this->db
 					->where($where)
 					->select($select)
@@ -833,30 +847,84 @@ class Home_model extends CI_Model
 	}	
 
 	public function test(){
+		$sem = '1st';
+		$sy = '2018-2019';
 		$ssi_id = '9304';
-		$to_pay = 130;
-		$data = [
-			[
-				"id" => "13",
-				"name" => "ID Sling",
-				"price" => "30",
-				"quantity" => "1",
-				"subtotal" => "30"
-			],
-			[
-				"id" => "14",
-				"name" => "Student Hand Book",
-				"price" => "100",
-				"quantity" => "1",
-				"subtotal" => "100"
-			]
-		];
+		$select = ' assessment.assessmentId,
+					assessment.ssi_id,
+					assessment.feeType,
+					sy.sy,
+					sem.sem,
+					assessment.particular,
+					assessment.amt1 as price1,
+					assessment.amt2 as price2,
+					pd.amt1 as paid1,
+					pd.amt2 as paid2,
+					payments.amt1 as or_paid1,
+					payments.amt2 as or_paid2,
+					payments.orNo,
+					payments.paymentId,
+					payments.printingType,
+					payments.paymentStatus,
+					payments.paymentDate';
+		$where  = array('assessment.ssi_id' => $ssi_id, 'sem.sem' => $sem, 'sy.sy' => $sy);
 
-		foreach ($data as $key => $value) {
-			echo "<pre>";
-			print_r($value);
+		$bills = $this->db
+					->where($where)
+					->select($select)
+					->join('sy', 'sy.syId = assessment.syId')
+					->join('sem', 'sem.semId = assessment.semId')
+					->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', "LEFT")
+					->join('payments', 'payments.paymentId = pd.paymentId', "LEFT")
+					->get('assessment')
+					->result();
+
+		$payments = [];
+		$bridging_bills = [];
+		$non_bridging_bills = [];
+		foreach ($bills as $key => $value) {
+			// for payments
+			if($value->orNo){
+				$payments[$value->orNo]['amount'] = $value->or_paid2;
+				$payments[$value->orNo]['payment_date'] = $value->paymentDate;
+				$payments[$value->orNo]['printing_type'] = $value->printingType;
+				$payments[$value->orNo]['payment_status'] = $value->paymentStatus;
+				$payments[$value->orNo]['paymentId'] = $value->paymentId;
+				$payments[$value->orNo]['details'][] = $value;
+			}
+			if( strtolower($value->feeType) == 'bridging'){
+				$value->particular = "&nbsp;&nbsp;&nbsp;&nbsp;" . $value->particular;
+				$bridging_bills[] = $value;
+			}
+			if( strtolower($value->feeType) != 'bridging'){
+				$non_bridging_bills[] = $value;
+			}
 		}
+		$bridging_row = [];
+		if(!empty($bridging_bills)){
+			$bridging_row = [
+				'particular' => '<b>Bridging</b>',
+				'price2' => '',
+				'paid2' => ''
+			];
+			array_unshift($bridging_bills, $bridging_row);
+		}
+		$grouped_nonb_bills = [];
+		foreach ($non_bridging_bills as $key => $value) {
+			$grouped_nonb_bills[$value->assessmentId] = $value;
+		}
+
+		echo "<pre>";
+		print_r($grouped_nonb_bills);
+
+		$final_bills = array_merge($non_bridging_bills, $bridging_bills);
+
+		$a = [
+			'bills' => $final_bills,
+			'payments' => $payments
+		];
 	}
+	
 	public function testt($spi_id = '9304'){
 
 		$sis_db = $this->load->database('sis_db', TRUE);

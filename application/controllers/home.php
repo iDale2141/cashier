@@ -49,7 +49,7 @@ class Home extends CI_Controller
 				"course"  => $course['course'] . "-" . $course['year']->year,
 				"course_type" => $course['course_type'], 
 				"type"    => 'student',
-				"data"    => $this->breakdown_data($value->ssi_id),
+				"data"    => $this->breakdown_data("student", $value->ssi_id),
 				"current_status" =>  $current_status ? strtoupper($current_status->current_stat) : null,
 				"other_payee_id" => ""
 		    ];
@@ -69,7 +69,7 @@ class Home extends CI_Controller
 				"course_type" => '',
 				"course"  => '', 
 				"type"    => 'non-student',
-				"data"    => [],
+				"data"    => $this->breakdown_data("non-student", $value->otherPayeeId),
 				"current_status" => '',
 				"other_payee_id" => $value->otherPayeeId
 		    ];
@@ -89,10 +89,10 @@ class Home extends CI_Controller
 		return $course;	
 	}
 
-	public function breakdown_data($ssi_id){
+	public function breakdown_data($payee_type, $ssi_id){
 		
 		$home_model = $this->load->model('Home_model');
-		$data       = $this->Home_model->breakdown_data($ssi_id);
+		$data       = $this->Home_model->breakdown_data($payee_type, $ssi_id);
 		return $data;
 	}
 
@@ -162,6 +162,10 @@ class Home extends CI_Controller
 
 	public function receipt(){
 		$this->load->view('receipt');
+	}
+
+	public function receipt_acknowledgement(){
+		$this->load->view('acknowledgement_receipt');
 	}
 
 }

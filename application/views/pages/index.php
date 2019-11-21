@@ -56,15 +56,12 @@
 			</div>
 			<ol class="breadcrumb" style="margin-top:30px;">
 				<li><a href="javascript:;">Home</a></li>
-				<li><a href="javascript:;">Page Options</a></li>
-				<li class="active">Page with Line Icons</li>
+				<li><a href="javascript:;">Cashier</a></li>
 			</ol>
 		</div>
 	</div>
 
-	<!-- <div class="widget-chart with-sidebar bg-black"> -->
-	<div class="widget-chart with-sidebar bdg-green">
-		
+	<div class="widget-chart with-sidebar bdg-green">		
 		<!-- MAIN CONTENT -->
         <div class="widget-chart-content">
             </h3>
@@ -89,12 +86,8 @@
 				</div>
             </div>
         </div>
-        <!-- <div class="widget-chart-sidebar bg-black-darker"> -->
         <div class="widget-chart-sidebar bdg-greener" style="padding:10px !important;">
-            <!-- <div class="chart-number">
-                1,225,729
-                <small>visitors</small>
-            </div> -->
+
             <div id="visitors-donut-chart" style="height: 160px">
 
 				<div class="wrapper" style="padding:10px 0px 0px !important;">
@@ -129,7 +122,6 @@
 						</div><br>
 						<div class="form-group mb5">
 							<button type="button" class="btn btn-lg btn-primary form-control" style="min-height: 70px; font-size: 20px;" v-on:click="submit_payment()">PAY</button>
-							<a href="<?= base_url('home/receipt'); ?>" class="btn btn-lg btn-success form-control">PRINT RECEIPT</a>
 						</div>
 					</form>
 
@@ -142,7 +134,6 @@
             </ul>
         </div>
 		<!-- tab content -->
-
     </div>
 
 	
