@@ -40,7 +40,7 @@ class Home_model extends CI_Model
 					->join('stud_per_info', 'stud_sch_info.spi_id = stud_per_info.spi_id')
 					->join('student_phone', 'student_phone.spi_id = stud_per_info.spi_id', 'left')
 					->join('phone_numbers', 'phone_numbers.phone_id = student_phone.phone_id', 'left')
-					->get('stud_sch_info', 5);
+					->get('stud_sch_info', 10);
 		return $query->result();
 	}
 
@@ -90,24 +90,18 @@ class Home_model extends CI_Model
 
 		$sis_db->select('*');
 		$sis_db->where("ssi_id", $ssi_id);
+		$sis_db->where("sch_year", $this->sy);
+		$sis_db->where("semester", $this->sem);
 		$sis_db->order_by('sch_year DESC, semester DESC');
-		$query = $sis_db->get('student_enrollment_stat', 1);
+		$query = $sis_db->get('student_enrollment_stat')->row();
 
 		$status = "";
 		if(!empty($query)){
-			$result = $query->result()[0];
-
-			if($result->sch_year == $this->sy && $result->semester == $this->sem){
-				$status = $result->status;
-			}
-			else{
-				$status = "not enrolled";
-			}
+			$status = $query->status;
 		}
 		else{
 			$status = "not enrolled";
 		}
-
 		return $status;
 	}
 
@@ -122,8 +116,8 @@ class Home_model extends CI_Model
 					->join('program_list', 'program_list.pl_id = stud_program.pl_id')
 					->get('stud_program', 5);
 
-		$course = $query->result()[0]->prog_code;
-		$course_type = $query->result()[0]->level;
+		$course = $query->result() ? $query->result()[0]->prog_abv : 'ERROR';
+		$course_type = $query->result() ? $query->result()[0]->level : 'ERROR';
 		$year  = $this->course_year($ssi_id);
 
 		return ["course" => $course, "year" => $year, "course_type" => $course_type];
@@ -138,7 +132,7 @@ class Home_model extends CI_Model
 					->where('ssi_id', $ssi_id)
 					->get("year", 15);
 
-		return $query->result()[0];
+		return $query->result() ? $query->result()[0] : (object) ["year" => 'ERROR'];
 	}
 
 	public function breakdown_data($payee_type, $payee_id){
@@ -649,6 +643,7 @@ class Home_model extends CI_Model
 						->join('sy', 'sy.syId = assessment.syId')
 						->join('sem', 'sem.semId = assessment.semId')
 						->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', 'LEFT')
+						->order_by('assessment.feeType')
 						->get('assessment')->result();
 
 			try {
@@ -672,7 +667,8 @@ class Home_model extends CI_Model
 							$distribution_amount -= floatval($res_value->remaining_balance2);
 							$particulars_tbp = [
 								'particular' => $res_value->particular,
-								'amount' => $res_value->remaining_balance2
+								'amount' => $res_value->remaining_balance2,
+								'amount_oracle' => number_format($res_value->remaining_balance1, 2) 
 							];
 							array_push($paid_particulars, $particulars_tbp);
 							continue;
@@ -698,7 +694,8 @@ class Home_model extends CI_Model
 
 							$particulars_tbp = [
 								'particular' => $res_value->particular,
-								'amount' => $distribution_amount
+								'amount' => $distribution_amount,
+								'amount_oracle' => number_format($amt1_val, 2)
 							];
 							array_push($paid_particulars, $particulars_tbp);
 							$distribution_amount = 0;
@@ -727,7 +724,7 @@ class Home_model extends CI_Model
 		}
 
 		$new_amt1 = array(
-		        'amt1' => $total_amt1
+	        'amt1' => $total_amt1
 		);
 
 		$this->db->where('paymentId', $payment_id);
@@ -738,9 +735,9 @@ class Home_model extends CI_Model
 
 	public function set_bills($ssi_id, $course){
 
-		$course = $course ? explode('-', $course)[0] : '';
 		$sis_db = $this->load->database('sis_db', TRUE);
 
+		$course = $course ? explode(' ', $course)[0] : '';
 		$ct_qry = $this->db->select('courseType')->where('particularName', $course)->get('particulars')->row();
 		$course_type = $ct_qry ? $ct_qry->courseType : null;
 
@@ -826,6 +823,41 @@ class Home_model extends CI_Model
 		return $data;
 	}
 
+	public function downpayment_bills($data){
+		$sis_db = $this->load->database('sis_db', TRUE);
+
+		$course = $data['course'] ? explode(' ', $data['course'])[0] : '';
+		$ct_qry = $this->db->select('courseType')->where('particularName', $course)->get('particulars')->row();
+		$course_type = $ct_qry ? $ct_qry->courseType : null;
+		
+		$year = $sis_db
+					->where('ssi_id', $data['ssi_id'])
+					->where('sch_year', $this->sy)
+					->where('semester', $this->sem)
+					->get('year')
+					->row();
+
+		if($course_type){
+			$particulars = $this->db
+					->where('syId', $this->syId)
+					->where('semId', $this->semId)
+					->where('feeType', 'Miscellaneous')
+					->where('courseType', $course_type)
+					->where('studentStatus', $year->current_stat)
+					->get('particulars')->result();
+
+			if($particulars){
+				return true;
+			}
+			else{
+				return false;
+			}
+		}
+		else{
+			return false;
+		}
+	}
+
 	public function sy_sem_id(){
 		$syId = $this->db
 					->select('syId')
@@ -847,82 +879,35 @@ class Home_model extends CI_Model
 	}	
 
 	public function test(){
-		$sem = '1st';
-		$sy = '2018-2019';
-		$ssi_id = '9304';
+		$ssi_id = '23488';
+
+
 		$select = ' assessment.assessmentId,
 					assessment.ssi_id,
-					assessment.feeType,
 					sy.sy,
 					sem.sem,
 					assessment.particular,
 					assessment.amt1 as price1,
 					assessment.amt2 as price2,
-					pd.amt1 as paid1,
-					pd.amt2 as paid2,
-					payments.amt1 as or_paid1,
-					payments.amt2 as or_paid2,
-					payments.orNo,
-					payments.paymentId,
-					payments.printingType,
-					payments.paymentStatus,
-					payments.paymentDate';
-		$where  = array('assessment.ssi_id' => $ssi_id, 'sem.sem' => $sem, 'sy.sy' => $sy);
+					IFNULL(pd.amt1,0) as paid1,
+					IFNULL(pd.amt2,0)as paid2,
+					CAST(assessment.amt1 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt1,0) AS DECIMAL(9, 2)) as remaining_balance1,
+					CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2)) as remaining_balance2';
 
-		$bills = $this->db
-					->where($where)
-					->select($select)
-					->join('sy', 'sy.syId = assessment.syId')
-					->join('sem', 'sem.semId = assessment.semId')
-					->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', "LEFT")
-					->join('payments', 'payments.paymentId = pd.paymentId', "LEFT")
-					->get('assessment')
-					->result();
 
-		$payments = [];
-		$bridging_bills = [];
-		$non_bridging_bills = [];
-		foreach ($bills as $key => $value) {
-			// for payments
-			if($value->orNo){
-				$payments[$value->orNo]['amount'] = $value->or_paid2;
-				$payments[$value->orNo]['payment_date'] = $value->paymentDate;
-				$payments[$value->orNo]['printing_type'] = $value->printingType;
-				$payments[$value->orNo]['payment_status'] = $value->paymentStatus;
-				$payments[$value->orNo]['paymentId'] = $value->paymentId;
-				$payments[$value->orNo]['details'][] = $value;
-			}
-			if( strtolower($value->feeType) == 'bridging'){
-				$value->particular = "&nbsp;&nbsp;&nbsp;&nbsp;" . $value->particular;
-				$bridging_bills[] = $value;
-			}
-			if( strtolower($value->feeType) != 'bridging'){
-				$non_bridging_bills[] = $value;
-			}
-		}
-		$bridging_row = [];
-		if(!empty($bridging_bills)){
-			$bridging_row = [
-				'particular' => '<b>Bridging</b>',
-				'price2' => '',
-				'paid2' => ''
-			];
-			array_unshift($bridging_bills, $bridging_row);
-		}
-		$grouped_nonb_bills = [];
-		foreach ($non_bridging_bills as $key => $value) {
-			$grouped_nonb_bills[$value->assessmentId] = $value;
-		}
-
+		$result = $this->db
+						->select($select)
+						->where('assessment.ssi_id', $ssi_id)
+						->where('(CAST(assessment.amt2 AS DECIMAL(9, 2)) - CAST(IFNULL(pd.amt2,0) AS DECIMAL(9, 2))) >' , 0)
+						->where('sy.sy', '2019-2020')
+						->where('sem.sem', '1st')
+						->join('sy', 'sy.syId = assessment.syId')
+						->join('sem', 'sem.semId = assessment.semId')
+						->join('paymentdetails pd', 'pd.assessmentId = assessment.assessmentId', 'LEFT')
+						->order_by('feeType')
+						->get('assessment')->result();
 		echo "<pre>";
-		print_r($grouped_nonb_bills);
-
-		$final_bills = array_merge($non_bridging_bills, $bridging_bills);
-
-		$a = [
-			'bills' => $final_bills,
-			'payments' => $payments
-		];
+		print_r($result);
 	}
 	
 	public function testt($spi_id = '9304'){

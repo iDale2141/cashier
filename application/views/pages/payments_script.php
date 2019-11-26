@@ -198,7 +198,8 @@
 							formatted_payments: [],
 							final_payments: [],
 							receipt: 'OR',
-							payment_date: "<?php echo date('Y-m-d'); ?>"
+							payment_date: "<?php echo date('Y-m-d'); ?>",
+							downpayment_bills: true,							
 				};
 				Object.assign(this.$data, a);
 			},
@@ -259,6 +260,7 @@
 							$this.school_years_distinct();
 							$this.check_old_balances();
 							$this.payee_type = ui.item.type;
+							$this.downpayment_bills(ui.item.course, ui.item.current_status);
 						}
 						else{
 							$this.fee_type = 'other';
@@ -571,13 +573,14 @@
 			    	if(type == 'old_system'){
 			    		var a = 'OldSystem';
 			    	}
-
 			    	if(!this.to_be_paid.includes(a)){
-				    	this.to_be_paid.push(a)
+					    this.to_be_paid = []; // remove this line if you want to group all payments with different sy/sem in one OR
+					    this.to_be_paid.push(a);
 			    	}
 		    	}
 		    	else{
-		    		console.log("Already full paid")
+		    		alert('Already fully paid')
+		    		console.log("Already fully paid")
 		    	}
 		    	this.format_payments();
 		    },
@@ -811,12 +814,17 @@
 				});
 		    },
 		    print_receipt: function(data){
-		    	var particulars = [];
+		    	var particulars = []; // FOR ADJUSTED
+		    	var particulars_2 = []; // FOR ORACLE
 		    	if(this.fee_type == 'regular'){
 		    		$.each(data, function(index, val) {
 		    			particulars.push({
 		    				particular: val.particular,
 		    				amount: val.amount
+		    			});
+		    			particulars_2.push({
+		    				particular: val.particular,
+		    				amount: val.amount_oracle
 		    			});
 		    		});
 		    	}
@@ -833,17 +841,26 @@
 			    	var $this = this;
 			    	var amt = '';
 			    	var amt_words = "";
-			    	var or = window.open('<?= base_url('home/receipt'); ?>','or','height=500,width=900,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
+			    	var or  = window.open('<?= base_url('home/receipt'); ?>','or','height=500,width=900,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
 	    			var street = this.address.street ? this.address.street : '';
 	    			var brgy   = this.address.brgy_name ? this.address.brgy_name : '';
 	    			var city   = this.address.city_name ? this.address.city_name : '';
-	    			var address =  street + " " + brgy + ", " + city; 
+	    			var address =  street + " " + brgy + ", " + city;
+	    				or.title = 'Adjusted';
 			    		or.rows = particulars;
 		    			or.name = this.name;
 		    			or.address = address.toUpperCase();
 		    			or.amount = this.to_pay;
 		    			or.amt_words = this.numberToWords(this.to_pay)
 		    			or.date = this.payment_date;
+			    	var or2 = window.open('<?= base_url('home/receipt'); ?>','or2','height=500,width=900,left=800,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
+			    		or2.title = "For ORACLE";
+			    		or2.rows = particulars_2;
+		    			or2.name = this.name;
+		    			or2.address = address.toUpperCase();
+		    			or2.amount = this.to_pay;
+		    			or2.amt_words = this.numberToWords(this.to_pay)
+		    			or2.date = this.payment_date;
 		    	}
 		    	else{
 			    	var ar = window.open('<?= base_url('home/receipt_acknowledgement'); ?>','ar','height=500,width=900,left=50,top=50,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no, status=yes');
@@ -858,6 +875,17 @@
 		    	$('.modal').modal('hide');
 		    	$("#selected_student").val('');
 		    	this.resetData();
+		    },
+		    downpayment_bills: function(course, studentStatus){ // check if there are bills for downpayment
+		    	$this = this;
+		    	$.getJSON('<?= base_url("home/downpayment_bills") ?>', {course: course, studentStatus: studentStatus, ssi_id: $this.ssi_id}, function(json, textStatus) {
+		    		if(json == true){
+		    			$(".dp_btn").removeAttr('disabled')
+		    		}
+		    		else{
+		    			$(".dp_btn").attr('disabled')
+		    		}
+		    	});
 		    }
 	  	}
 	});

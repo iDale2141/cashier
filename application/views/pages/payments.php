@@ -197,7 +197,7 @@
 					<hr style="border:0.5px solid #777 !important;">
 				</h5>
 				<div class="text-center">			
-					<button class="btn btn-sm btn-success" v-if="has_current_bill == false && has_selected && enrollment_status == 'Enrolled'" v-on:click="add_to_payments($event)" data-type="down_payment" data-balance="1" data-sy="NA" data-sem="NA">Down Payment</button>
+					<button class="btn btn-sm btn-success dp_btn" v-if="has_current_bill == false && has_selected && enrollment_status == 'Enrolled'" v-on:click="add_to_payments($event)" data-type="down_payment" data-balance="1" data-sy="NA" data-sem="NA">Down Payment</button>
 				</div><br>
 				<div class="table-responsive" v-if="fee_type == 'regular'">
 					<table class="table table-striped table-hover table-bordered table-condensed">

@@ -137,7 +137,7 @@
 										</div>
 									</form>
 								</li>
-								<li class="dropdown navbar-user">
+								<li class="dropdown navbar-user"> 
 									<a href="javascript:;" class="dropdown-toggle" data-toggle="dropdown">
 										<img src="<?= base_url('public/color-admin/assets/img/user-13.jpg')?>" alt=""> 
 										<span class="hidden-xs"><?= $username; ?></span> <b class="caret"></b>

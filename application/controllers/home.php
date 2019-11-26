@@ -46,7 +46,7 @@ class Home extends CI_Controller
 				"phone_number" => $value->phone_number,
 				'address' => $this->Home_model->stud_address($value->spi_id),
 				"enrollment_status" => ucwords($this->check_enrollment_status($value->ssi_id)),
-				"course"  => $course['course'] . "-" . $course['year']->year,
+				"course"  => $course['course'] . " " . $course['year']->year,
 				"course_type" => $course['course_type'], 
 				"type"    => 'student',
 				"data"    => $this->breakdown_data("student", $value->ssi_id),
@@ -150,6 +150,12 @@ class Home extends CI_Controller
 		echo json_encode($res);
 	}
 
+	public function downpayment_bills(){
+		$home_model = $this->load->model('Home_model');
+		$db = $this->Home_model->downpayment_bills($_REQUEST);
+		echo json_encode($db);
+	}
+
 	public function test(){
 		$home_model = $this->load->model('Home_model');
 		$payment_schedule  = $this->Home_model->test();
@@ -163,7 +169,7 @@ class Home extends CI_Controller
 	public function receipt(){
 		$this->load->view('receipt');
 	}
-
+	
 	public function receipt_acknowledgement(){
 		$this->load->view('acknowledgement_receipt');
 	}
